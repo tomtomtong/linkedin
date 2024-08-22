@@ -51,13 +51,13 @@ export default function Home() {
             "UploadMessage": response.data.message,
           }
         }
-      ], function (err, records) {
+      ], function (err: Error | null, records: any) {
         if (err) {
           console.error(err);
           setMessage('File uploaded but failed to store information in Airtable.');
           return;
         }
-        records?.forEach(function (record) {
+        records?.forEach(function (record: any) {
           console.log(record.getId());
         });
         setMessage('File uploaded successfully and information stored in Airtable.');
