@@ -1,16 +1,16 @@
-// ClientComponent.tsx
+// ClientComponent.jsx
 'use client';
 
 import { useState, ChangeEvent } from 'react';
 
 export default function ClientComponent() {
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState(null);
   const [fileUrl, setFileUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
+    if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
   };
@@ -24,6 +24,8 @@ export default function ClientComponent() {
       const formData = new FormData();
       if (file) {
         formData.append('file', file);
+      } else {
+        throw new Error('No file selected');
       }
 
       const res = await fetch('/api/upload', {
