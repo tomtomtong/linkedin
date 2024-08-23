@@ -1,90 +1,77 @@
-'use client';
-
 import { useState } from 'react';
-import axios from 'axios';
-import { PDFImage } from 'pdf-image';
 
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState<string>('');
+  const [file, setFile] = useState(null);
+  const [fileUrl, setFileUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFile = e.target.files[0];
-      if (selectedFile.type === 'application/pdf' && selectedFile.size <= 10 * 1024 * 1024) { // 10MB limit
-        setFile(selectedFile);
-      } else {
-        setMessage('Please select a valid PDF file (up to 10MB).');
-      }
-    }
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!file) {
-      setMessage('Please select a file');
-      return;
-    }
-
-    const pdfImage = new PDFImage(file, {
-      outputDirectory: '/tmp',
-      convertOptions: {
-        '-quality': '100',
-      },
-    });
+    setIsLoading(true);
+    setError('');
 
     try {
-      const imagePaths = await pdfImage.convertFile();
-      const imageFile = await fetch(imagePaths[0]).then(res => res.blob());
-      const imageFileName = imagePaths[0].split('/').pop();
-
       const formData = new FormData();
-      formData.append('file', new File([imageFile], imageFileName!, { type: 'image/jpeg' }));
+      formData.append('file', file);
 
-      // Upload image to your server to get the URL
-      const uploadResponse = await axios.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
 
-      const imageUrl = uploadResponse.data.url; // Assuming your server returns the URL of the uploaded image
-
-      // Upload image to Wordware API
-      const wordwareResponse = await axios.post(
-        'https://app.wordware.ai/api/released-app/6de040fa-108d-4f32-93b4-d7c33a19d250/run',
-        {
-          inputs: {
-            "input image": {
-              type: "image",
-              url: imageUrl,
-            },
-          },
-          version: "^1.0",
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.WORDWARE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      setMessage('Image uploaded successfully to Wordware API.');
-    } catch (error) {
-      setMessage('Error converting or uploading file');
+      if (res.ok) {
+        const data = await res.json();
+        setFileUrl(data.fileUrl);
+      } else {
+        throw new Error('Error uploading file');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div>
-      <h1>PDF to Image Uploader</h1>
-      <form onSubmit={handleSubmit}>
-        <input type="file" accept="application/pdf" onChange={handleFileChange} />
-        <button type="submit">Upload</button>
-      </form>
-      {message && <p>{message}</p>}
+    <div className="flex flex-col items-center justify-center min-h-screen py-2">
+      <main className="flex flex-col items-center justify-center w-full flex-1 px-20 text-center">
+        <h1 className="text-4xl font-bold mb-8">Upload PDF</h1>
+        <form onSubmit={handleSubmit} className="mb-4 w-full max-w-md">
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={handleFileChange}
+            className="block w-full py-2 px-3 mb-4 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Uploading...' : 'Upload'}
+          </button>
+        </form>
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {fileUrl && (
+          <div className="mb-4">
+            <p className="text-lg font-semibold mb-2">File URL:</p>
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-700"
+            >
+              {fileUrl}
+            </a>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
