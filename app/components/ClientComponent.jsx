@@ -1,4 +1,4 @@
-// ClientComponent.jsx
+// ClientComponent.tsx
 'use client';
 
 import { useState, ChangeEvent } from 'react';
@@ -10,7 +10,7 @@ export default function ClientComponent() {
   const [error, setError] = useState('');
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+    if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
     }
   };
@@ -37,8 +37,8 @@ export default function ClientComponent() {
       } else {
         throw new Error('Error uploading file');
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
       console.error(err);
     } finally {
       setIsLoading(false);
