@@ -1,11 +1,8 @@
-// app/page.tsx
 'use client';
 
 import { useState } from 'react';
 import axios from 'axios';
-import Airtable from 'airtable';
-
-const base = new Airtable({ apiKey: 'patpBNGYBDzsqAZ9g.73721a412e8b694ef292c7bed9c58e628145611a6a0bd84cd2e41ab6d90e0640' }).base('app4VlUW2KU0yo82z');
+import { PDFImage } from 'pdf-image';
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -30,47 +27,59 @@ export default function Home() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const pdfImage = new PDFImage(file, {
+      outputDirectory: '/tmp',
+      convertOptions: {
+        '-quality': '100',
+      },
+    });
 
     try {
-      const response = await axios.post('/api/upload', formData, {
+      const imagePaths = await pdfImage.convertFile();
+      const imageFile = await fetch(imagePaths[0]).then(res => res.blob());
+      const imageFileName = imagePaths[0].split('/').pop();
+
+      const formData = new FormData();
+      formData.append('file', new File([imageFile], imageFileName!, { type: 'image/jpeg' }));
+
+      // Upload image to your server to get the URL
+      const uploadResponse = await axios.post('/api/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      setMessage(response.data.message);
+      const imageUrl = uploadResponse.data.url; // Assuming your server returns the URL of the uploaded image
 
-      // After successful file upload, store information in Airtable
-      base('Table 1').create([
+      // Upload image to Wordware API
+      const wordwareResponse = await axios.post(
+        'https://app.wordware.ai/api/released-app/6de040fa-108d-4f32-93b4-d7c33a19d250/run',
         {
-          "fields": {
-            "FileName": file.name,
-            "UploadStatus": "Success",
-            "UploadMessage": response.data.message,
-          }
+          inputs: {
+            "input image": {
+              type: "image",
+              url: imageUrl,
+            },
+          },
+          version: "^1.0",
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.WORDWARE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
         }
-      ], function (err: Error | null, records: any) {
-        if (err) {
-          console.error(err);
-          setMessage('File uploaded but failed to store information in Airtable.');
-          return;
-        }
-        records?.forEach(function (record: any) {
-          console.log(record.getId());
-        });
-        setMessage('File uploaded successfully and information stored in Airtable.');
-      });
+      );
 
+      setMessage('Image uploaded successfully to Wordware API.');
     } catch (error) {
-      setMessage('Error uploading file');
+      setMessage('Error converting or uploading file');
     }
   };
 
   return (
     <div>
-      <h1>PDF Uploader</h1>
+      <h1>PDF to Image Uploader</h1>
       <form onSubmit={handleSubmit}>
         <input type="file" accept="application/pdf" onChange={handleFileChange} />
         <button type="submit">Upload</button>

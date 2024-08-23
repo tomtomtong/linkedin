@@ -1,7 +1,6 @@
-import axios from 'axios';
-import FormData from 'form-data';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
+import { Pool } from 'pg';
 
 export const config = {
   api: {
@@ -21,22 +20,38 @@ export default async function handler(req, res) {
 
       const file = files.file;
       const filePath = file.filepath;
-
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(filePath));
-      formData.append('type', 'upload');
+      const fileData = fs.readFileSync(filePath);
 
       try {
-        const response = await axios.post('https://api.airtable.com/v0/app4VlUW2KU0yo82z/Attachments', formData, {
-          headers: {
-            'Authorization': `patpBNGYBDzsqAZ9g.73721a412e8b694ef292c7bed9c58e628145611a6a0bd84cd2e41ab6d90e0640`,
-            ...formData.getHeaders(),
-          },
+        // Connect to the PostgreSQL database
+        const pool = new Pool({
+          connectionString: 'postgresql://Linkedin_owner:06XfYozAUnvu@ep-proud-sun-a54gdm27.us-east-2.aws.neon.tech/Linkedin?sslmode=require',
         });
 
-        res.status(200).json({ message: 'File uploaded successfully' });
+        // Create a table to store the files if it doesn't exist
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS files (
+            id SERIAL PRIMARY KEY,
+            file_name TEXT,
+            file_data BYTEA
+          )
+        `);
+
+        // Insert the file data into the table
+        const query = {
+          text: 'INSERT INTO files (file_name, file_data) VALUES ($1, $2) RETURNING id',
+          values: [file.originalFilename, fileData],
+        };
+        const result = await pool.query(query);
+        const fileId = result.rows[0].id;
+
+        // Generate the file URL
+        const fileUrl = `${req.headers.origin}/api/get-file?fileId=${fileId}`;
+
+        res.status(200).json({ message: 'File uploaded successfully', fileUrl });
       } catch (error) {
-        res.status(500).json({ message: 'Error uploading file to Airtable' });
+        console.error('Error uploading file to PostgreSQL:', error);
+        res.status(500).json({ message: 'Error uploading file to PostgreSQL' });
       }
     });
   } else {
