@@ -1,26 +1,30 @@
 // ClientComponent.jsx
-'use client'; // Add this directive at the top of the file
+'use client';
 
-import { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 
-export default function Home() {
-  const [file, setFile] = useState(null);
+export default function ClientComponent() {
+  const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      if (file) {
+        formData.append('file', file);
+      }
 
       const res = await fetch('/api/upload', {
         method: 'POST',
