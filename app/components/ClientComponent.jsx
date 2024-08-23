@@ -39,7 +39,7 @@ export default function ClientComponent() {
       } else {
         throw new Error('Error uploading file');
       }
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || 'An error occurred');
       console.error(err);
     } finally {
